@@ -11,13 +11,13 @@ int parse_pat(unsigned char *pat , PSI_PAT *psi_pat)
     if(table_id(pat) != 0)
         return -1;
 
-    if((section_length(pat) - 9)&0x3)
+    if((pat_section_length(pat) - 9)&0x3)
     {
-        printf("section_length Error!\n");
+        printf("pat_section_length Error!\n");
         return -1;
     }
 
-    N = (section_length(pat) - 9) >> 2;
+    N = (pat_section_length(pat) - 9) >> 2;
     psi_pat->prg_count = N;
     for(i = 0; i < N; i++)
     {
@@ -37,5 +37,4 @@ int show_pat(PSI_PAT *psi_pat)
         printf("map_pid       :%#x\n",psi_pat->prorams[i].map_pid);
     }
     return 0;
-
 }

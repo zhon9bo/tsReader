@@ -6,7 +6,7 @@
 //PAT Head 8 byte
 #define table_id(pat)                    (pat[0])
 #define section_syntax_indicator(pat)    ((pat[1]>>7)&0x1)
-#define section_length(pat)              (((pat[1]&0xf)<<8)|pat[2])
+#define pat_section_length(pat)              (((pat[1]&0xf)<<8)|pat[2])
 #define transport_stream_id(pat)         ((pat[3]<<8) | pat[4])
 #define version_number(pat)              ((pat[5]>>1)&0x1f)  
 #define current_next_indicator(pat)      (pat[5]&0x1)
@@ -28,4 +28,5 @@ typedef struct{
 }PSI_PAT;
 
 extern int parse_pat(unsigned char *pat , PSI_PAT *psi_pat);
+extern int show_pat(PSI_PAT *psi_pat);
 #endif

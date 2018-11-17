@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "input.h": "c",
+        "crc32.h": "c",
+        "programs.h": "c",
+        "table.h": "c",
+        "sdt.h": "c"
+    }
+}

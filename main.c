@@ -3,40 +3,45 @@
 #include "opration.h"
 #include "table/pat.h"
 #include "table/pmt.h"
+#include "table/sdt.h"
+#include "input/input.h"
+#include "table/table.h"
+#include "mpegts/programs.h"
 
 int main()
 {
-	unsigned char psi[1024];
-	FILE * ts;
-	int size;
-	unsigned int i;
-	PSI_PAT pat;
-	PSI_PMT pmt;
+	struct list_head section_list;
+	CHANNEL channel;
+	PROGRAM *program;
+	int i = 0;
 
-	ts = fopen("100.ts","rb");
-	printf("PAT:\n");
-	memset(psi,0,1024);
-	size = getpsi(0, 1, ts, psi);
-	if(size != -1)
-		printbufhex(psi, size, 16);
-	parse_pat(psi, &pat);
-	show_pat(&pat);
+	INPUT_Init();
+	INPUT_AllChannel_Init();
+	
+	TABLE_Packets2Section("tsfile", 1, 0, 0, &section_list);
+	//memset(&channel, 0, sizeof(CHANNEL));
+	channel.programs = NULL;
+	parse_pat(&section_list,&channel);
+	del_sections(&section_list);
 
-	for(i = 0; i < pat.prg_count; i++)
-	{	
-		printf("\nprogram %d/%d\n",i+1,pat.prg_count);
-		memset(psi,0,1024);
-		size = getpsi(pat.prorams[i].map_pid, 1, ts, psi);
-		if(size == -1)
-			return -1;
-		printbufhex(psi, size, 16);
-		parse_pmt(psi, &pmt);	
-		show_pmt(&pmt);
+	TABLE_Packets2Section("tsfile", 1, 0x11, 0x42, &section_list);
+	parse_sdt(&section_list,&channel);
+	del_sections(&section_list);
+
+	program = channel.programs;
+	while(program != NULL)
+	{
+		i++;
+		printf("\n节目[%#X(%d)]    PID:%#X(%d)\n",program->program_number,program->program_number,program->pmt_pid,program->pmt_pid);
+		TABLE_Packets2Section("tsfile", 1, program->pmt_pid, 0x2, &section_list);
+		parse_pmt(&section_list,program);
+		del_sections(&section_list);
+
+		program = program->next;
 	}
 
-	size = getpsi(0x11, 1, ts, psi);
-	if(size == -1)
-		return -1;
-	printbufhex(psi, size, 16);
+	PROGRAM_Show(channel.programs);
+	
 	return 0;
+
 }

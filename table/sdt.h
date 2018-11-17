@@ -1,5 +1,7 @@
 #ifndef _SDT_H_
 #define _SDT_H_
+#include "descriptors.h"
+#include "../mpegts/programs.h"
 
-#define sdt_section_length(pmt)              (((pmt[1]&0xf)<<8)|pmt[2])
+extern int parse_sdt(struct list_head *sections_head, CHANNEL *channel);
 #endif

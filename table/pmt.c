@@ -1,49 +1,79 @@
 #include <stdio.h>
-#include "pmt.h"
-int parse_pmt(unsigned char *pmt, PSI_PMT *psi_pmt)
+#include <stdlib.h>
+#include <string.h>
+
+//#include "pmt.h"
+#include "table.h"
+#include "../mpegts/programs.h"
+#include "descriptors.h"
+
+int parse_pmt(struct list_head *sections_head, PROGRAM *programs)
 {
-    int section_length;
-    int es_length;
-    int es_count = 0;
-    unsigned char *cur_es;
-    int remain_len;
+    ELEM_STREM *elem_stream;
+    ELEM_STREM *elem_stream_new;
+    SECTION *section;
+    unsigned char *section_buf;
+    unsigned int pos;
+    unsigned int stream_type;
+    unsigned int elem_pid;
+    unsigned int pcr_pid;
+    unsigned int program_info_length;
+    unsigned int es_info_length;
 
-    psi_pmt->prg_info_len   = program_info_length(pmt);
-    psi_pmt->pcr_pid        = PCR_PID(pmt);
-    psi_pmt->program_number = pmt_program_number(pmt);
+    if(sections_head == NULL || programs == NULL)
+        return -1;
 
-    section_length = pmt_section_length(pmt);
-    es_length = section_length - 9 - program_info_length(pmt) - 4;
-    remain_len = es_length;
-    cur_es = FIRST_ES_HEAD(pmt);
-    while(remain_len > 0)
+    if(list_empty(sections_head))
+        return -1;
+
+    elem_stream = programs->elem_streams;
+       
+    if(elem_stream != NULL)
     {
-        es_count++;
-        psi_pmt->es[es_count-1].stream_type = stream_type(cur_es);
-        psi_pmt->es[es_count-1].pid = elementary_PID(cur_es);
-        psi_pmt->es[es_count-1].es_info_len = ES_info_length(cur_es);
-        remain_len -= ES_info_length(cur_es) + 5;
-        cur_es = NEXT_ES_HEAD(cur_es);
+        printf("删除所有elem stream\n");
+        ELEM_STREM_Del_All(elem_stream);
     }
-    psi_pmt->es_count = es_count;
 
-    return 0;
-}
-
-int show_pmt(PSI_PMT *psi_pmt)
-{
-    int es_count = psi_pmt->es_count;
-    int i = 0;
-    printf("program number:%#x(%d)\n",psi_pmt->program_number,psi_pmt->program_number);
-    printf("pcr pid:%#x(%d)\n",psi_pmt->pcr_pid,psi_pmt->pcr_pid);
-    printf("program_info_length:%#x(%d)\n",psi_pmt->prg_info_len,psi_pmt->prg_info_len);
-
-    while(es_count--)
+    list_for_each_entry(section, sections_head, list)
     {
-        printf("\n\tstream type:%#x(%d)\n",psi_pmt->es[i].stream_type,psi_pmt->es[i].stream_type);
-        printf("\tpid:%#x(%d)\n",psi_pmt->es[i].pid,psi_pmt->es[i].pid);
-        printf("\tes_info_len:%#x(%d)\n",psi_pmt->es[i].es_info_len,psi_pmt->es[i].es_info_len);
-        i++;
+        section_buf = section->section;
+        pos = 8;
+        
+        pcr_pid = (section_buf[pos]<<8|section_buf[pos+1])&0x1fff;
+        program_info_length = (section_buf[pos+2]<<8|section_buf[pos+3])&0xfff;
+
+        programs->pcr_pid = pcr_pid;
+        programs->program_info_length = program_info_length;
+
+        /*处理描述符*/ 
+        parse_descriptor(&(programs->program_desc), &section_buf[pos+4], program_info_length);
+
+        pos += 4 + program_info_length;
+
+        while((pos+9) <= section->section_length)
+        {
+            stream_type    = section_buf[pos];
+            elem_pid       = (section_buf[pos+1]<<8 | section_buf[pos+2])&0x1fff;
+            es_info_length = (section_buf[pos+3]<<8 | section_buf[pos+4])&0xfff;
+
+            elem_stream_new = ELEM_STREM_FindBy_PID(elem_stream,elem_pid);
+            if(elem_stream_new == NULL)
+            {
+                elem_stream_new = ELEM_STREM_New(stream_type, elem_pid, es_info_length);
+                if(elem_stream_new != NULL)
+                {   
+                    /*处理描述符*/   
+                    parse_descriptor(&(elem_stream_new->es_desc), &section_buf[pos+5], es_info_length);
+                    ELEM_STREM_Add(&(programs->elem_streams),elem_stream_new);
+                }
+            }
+            else
+            {
+                printf("存在相同PID的Elem Stream\n");
+            }
+
+            pos += 5 + es_info_length;
+        }
     }
 
     return 0;
